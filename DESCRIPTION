@@ -1,0 +1,15 @@
+Package: medMatch
+Type: Package
+Title: Sensitivity analysis for mediation effects via matching.
+Version: 1.0
+Date: 2014-06-11
+Author: Julian Wolfson
+Maintainer: Julian Wolfson <julianw@umn.edu>
+Description: Performs a matching-based sensitivity analysis to estimate the
+    natural direct effect and hence assess the mediating effect of a biomarker
+    in the context of a randomized treatment.
+License: 
+Imports:
+    boot,
+    Matching
+Roxygen: list(wrap = FALSE)
