@@ -19,7 +19,7 @@ propScores <- function(dat) {
 ################
 #' Calculates matching-based bounds on the natural direct effect.
 #' 
-#' Internal function for calculating matching-based bounds for the NDE.
+#' Internal function for calculating matching-based bounds for the natural direct effect.
 #' 
 #' This function is called by the bootstrap procedure in the main \code{\link{DeltaBounds}} function.
 #' 
@@ -109,17 +109,18 @@ getBounds <- function(DAT,inds,Gamma=1,Psi=Gamma,effect="ATT") {
 #'  and \code{"Delta0"}, corresponding to \eqn{E(Y^{1S(1)} - Y^{0S(1)})} and \eqn{E(Y^{1S(0)} - Y^{0S(0)})} respectively.
 #' @param R Number of bootstrap samples used to estimate uncertainty intervals. Defaults to \code{500}.
 #' @param conf Confidence level for the bootstrapped uncertainty intervals. Defaults to \code{0.95}.
-#' @return A vector of containing:
+#' @return A list containing:
 #'  \describe{
 #'  \item{\code{delta}}{The point estimate for the NDE.}
-#'  \item{\code{delta.II}}{The ignorance interval for the NDE, reflecting only uncertainty due to unmeasured confounding as reflected by \code{Gamma} and \code{Psi}.}
-#'  \item{\code{delta.CI}}{The confidence interval for the NDE, reflecting only stochastic uncertainty, ignoring uncertainty due to unmeasured confounding.}
-#'  \item{\code{delta.UI}}{The uncertainty interval for the NDE, reflecting both sources of uncertainty.}
+#'  \item{\code{CI}}{The confidence interval for the NDE, reflecting only stochastic uncertainty, ignoring uncertainty due to unmeasured confounding.}
+#'  \item{\code{II}}{The ignorance interval for the NDE, reflecting only uncertainty due to unmeasured confounding as reflected by \code{Gamma} and \code{Psi}.}
+#'  \item{\code{UI}}{The uncertainty interval for the NDE, reflecting both sources of uncertainty.}
 #' }
 #' @export
 DeltaBounds <- function(Z,Y,S,W,S.cat=NULL,Gamma=1,Psi=1,NDE="Delta1",R=500,conf=0.95) {
+  
   if(is.null(S.cat)) { 
-    cut.pts <- c(-Inf,quantile(dat$S,c(0.25,0.5,0.75)),Inf)
+    cut.pts <- c(-Inf,quantile(S,c(0.25,0.5,0.75)),Inf)
     S.cat <- cut(S,cut.pts,labels=FALSE)
   }
   sapply(levels(S.cat),function(l) {
@@ -133,17 +134,55 @@ DeltaBounds <- function(Z,Y,S,W,S.cat=NULL,Gamma=1,Psi=1,NDE="Delta1",R=500,conf
     else{ stop("Not a recognized type of Natural Direct effect. Valid types are 'Delta1' and 'Delta0'")}
   }
   if(Gamma < 1 | Psi < 1) { stop("Only sensitivity parameter values >= 1 are permitted.")}
-  BOOT.W <- boot::boot(dat,getBounds,R=R,Gamma=Gamma,Psi=Psi,effect=effect)
   
-  BCI.LB <- boot::boot.ci(BOOT.W,conf=conf,type=c("norm","basic","perc"),index=1)
-  BCI.DELTA <- boot::boot.ci(BOOT.W,conf=conf,type=c("norm","basic","perc"),index=2)
-  BCI.UB <- boot::boot.ci(BOOT.W,conf=conf,type=c("norm","basic","perc"),index=3)
+  BOOT.W <- boot::boot(dat,
+                       getBounds,
+                       R=R,
+                       Gamma=Gamma,
+                       Psi=Psi,
+                       effect=effect)
+  
+  BCI.LB <- boot::boot.ci(BOOT.W,
+                          conf=conf,
+                          type=c("norm","basic","perc"),
+                          index=1)
+  BCI.DELTA <- boot::boot.ci(BOOT.W,
+                             conf=conf,
+                             type=c("norm","basic","perc"),
+                             index=2)
+  BCI.UB <- boot::boot.ci(BOOT.W,
+                          conf=conf,
+                          type=c("norm","basic","perc"),
+                          index=3)
   
   DELTA.L <- BOOT.W$t0[1]
   DELTA.MN <- BOOT.W$t0[2]
   DELTA.U <- BOOT.W$t0[3]
-  ##c(DELTA.MN,BCI.DELTA$perc[4:5],BCI.LB$perc[4],BCI.UB$perc[5])
-  c(delta=DELTA.MN,delta.CI=BCI.DELTA$perc[4:5],delta.II=c(DELTA.L,DELTA.U),delta.UI=c(BCI.LB$perc[4],BCI.UB$perc[5]))
+
+  return( list( delta=DELTA.MN,
+                CI=BCI.DELTA$perc[4:5],
+                II=c(DELTA.L,DELTA.U),
+                UI=c(BCI.LB$perc[4],BCI.UB$perc[5]) )
+  )
   
 }
 
+plotBounds <- function(Delta, CI, UI, Gamma.vals ) {
+  ## In progress; need to make more general for Delta.1 or Delta.0
+  
+  df <-data.frame( Delta, CI = CI, UI = UI, Gamma.vals = factor(Gamma.vals) )
+  
+    g <- ggplot( df, aes( x = Gamma.vals, y = Delta ))
+    g <- g + geom_point( size=5, shape = 18 ) +
+          geom_errorbar( aes( ymin = UI.1, ymax = UI.2 ), width = 0.3, colour = gray(0.5)) +
+          geom_linerange( aes( ymin = CI.1, ymax = CI.2 ), size=1.2) +
+          geom_hline( y = 0 ) + 
+          xlab( expression(Gamma == Psi) ) #+
+    #ylab( expression(Delta^{N}*(1)) ) +
+    #ggtitle( "Matching every treated subject" )
+  
+  return(g)
+  
+
+}
+  
